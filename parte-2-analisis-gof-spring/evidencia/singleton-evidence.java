@@ -1,19 +1,53 @@
-// Clase: org.springframework.beans.factory.support.DefaultSingletonBeanRegistry
-// Método: getSingleton(String beanName)
+package org.springframework.beans.factory.support;
 
-/** Cache of singleton objects: bean name to bean instance. */
+import java.util.Map;
+
+import java.util.concurrent.ConcurrentHashMap;
+
+import org.springframework.lang.Nullable;
+
+public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements SingletonBeanRegistry {
+
+/** Caché de objetos singleton: nombre del bean -> instancia del bean */
+
 private final Map<String, Object> singletonObjects = new ConcurrentHashMap<>(256);
 
 @Override
+
+@Nullable
+
 public Object getSingleton(String beanName) {
-    return getSingleton(beanName, true);
+
+return getSingleton(beanName, true);
+
 }
 
+@Nullable
+
 protected Object getSingleton(String beanName, boolean allowEarlyReference) {
-    // Quick check for existing instance without full singleton lock
-    Object singletonObject = this.singletonObjects.get(beanName);
-    if (singletonObject == null) {
-        // ... lógica para crear la instancia si no existe
-    }
-    return singletonObject;
+
+// Intenta obtener la instancia existente desde la caché concurrente
+
+Object singletonObject = this.singletonObjects.get(beanName);
+
+if (singletonObject == null && isSingletonCurrentlyInCreation(beanName)) {
+
+synchronized (this.singletonObjects) {
+
+singletonObject = this.singletonObjects.get(beanName);
+
+if (singletonObject == null) {
+
+// Lógica para manejar referencias tempranas y resolución de dependencias circulares
+
+}
+
+}
+
+}
+
+return singletonObject;
+
+}
+
 }
