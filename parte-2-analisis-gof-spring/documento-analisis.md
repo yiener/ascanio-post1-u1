@@ -1,150 +1,226 @@
 # Análisis de Patrones GoF en Spring Framework
 
-**Autor:** YEINER ASCANIO COLMENARES  
-**Código:** 02230132014  
-**Curso:** Patrones de Diseño de Software  
-**Unidad:** 1 – Fundamentos de Patrones de Diseño y Buenas Prácticas  
-**Fecha:** 18/08/2026  
+---
+
+## Portada
+
+* **Nombre del Estudiante:** Yeiner Ascanio Colmenares
+* **Código:** 02230132014
+* **Curso:** Patrones de Diseño de Software
+* **Unidad:** Unidad 1 – Fundamentos de Patrones de Diseño y Buenas Prácticas
+* **Fecha:** 18 de agosto de 2026
 
 ---
 
 ## 1. Introducción
 
-El presente documento tiene como objetivo analizar la aplicación de patrones de diseño GoF (Gang of Four) en el framework Spring, específicamente en su ecosistema Spring Boot. Spring es uno de los frameworks más utilizados en el desarrollo de aplicaciones empresariales Java, y su arquitectura está fuertemente basada en patrones de diseño que facilitan la mantenibilidad, extensibilidad y desacoplamiento del código.
+En el ámbito de la ingeniería de software moderna, los patrones de diseño catalogados por el *Gang of Four* (GoF) constituyen soluciones probadas para abordar problemas recurrentes en la arquitectura e implementación de sistemas orientados a objetos. Dentro del ecosistema Java, el marco de trabajo **Spring Framework** (y su extensión **Spring Boot**) representa uno de los casos de estudio más icónicos en la aplicación sistemática de estas soluciones. Spring Boot abstrae la configuración compleja del desarrollo empresarial mediante un contenedor de Inversión de Control (IoC) y un conjunto de módulos que delegan responsabilidades clave a patrones bien definidos, logrando un balance entre mantenibilidad, extensibilidad y modularidad.
 
-Se han seleccionado tres patrones de distintas categorías (Creacional, Estructural y de Comportamiento) que se encuentran presentes en el núcleo de Spring. Para cada uno se describirá su propósito, la clase concreta donde se implementa, el problema que resuelve, un extracto de código fuente que lo evidencie y la relación con los principios SOLID. Este análisis permite comprender por qué Spring es un framework robusto y cómo la aplicación sistemática de patrones de diseño contribuye a su calidad arquitectónica.
+El objetivo general de este documento es analizar la presencia y función de los patrones de diseño GoF dentro de la arquitectura interna de Spring Framework. Para cumplir este propósito, se examinarán tres patrones representativos pertenecientes a las tres categorías fundamentales (Creacional, Estructural y de Comportamiento), identificando sus componentes concretos dentro del código fuente del framework, el problema específico que resuelven en la gestión de la aplicación, su manifestación técnica mediante snippets de código Java y su alineación directa con los principios SOLID de diseño orientado a objetos.
 
 ---
 
 ## 2. Análisis de Patrón 1: Singleton (Creacional)
 
-### Nombre y categoría
-* **Patrón:** Singleton  
-* **Categoría:** Creacional  
-* **Propósito:** Garantizar que una clase tenga una única instancia y proporcionar un punto de acceso global a ella.
+### Nombre y Categoría
+* **Nombre del Patrón:** Singleton
+* **Categoría:** Creacional
+* **Propósito:** Garantizar que una clase tenga una única instancia en el ciclo de vida de la aplicación y proporcionar un punto de acceso global y controlado a dicha instancia.
 
-### Ubicación en Spring
-* **Clase:** `org.springframework.beans.factory.support.DefaultSingletonBeanRegistry`  
-* **Módulo:** `spring-beans`
+### Clase / Componente en Spring
+* **Clase Concreta:** `org.springframework.beans.factory.support.DefaultSingletonBeanRegistry`
+* **Módulo de Spring:** `spring-beans`
+* **Ámbito / Scope:** Contenedor de IoC (*Singleton Scope* por defecto)
 
-### Problema que resuelve
-Spring necesita gestionar el ciclo de vida de los beans que se definen en el contenedor IoC (*Inversion of Control*). Por defecto, los beans tienen alcance *singleton*, es decir, el contenedor crea una única instancia por cada bean definido y la reutiliza en todas las inyecciones de dependencia. Sin este patrón, cada vez que se solicitara un bean se crearía una nueva instancia, lo que aumentaría el consumo de memoria y podría generar inconsistencias en el estado compartido. El Singleton resuelve este problema centralizando la creación y almacenamiento de la instancia única en el registro de singletons.
+### Problema que Resuelve
+En aplicaciones empresariales de gran escala, instanciar repetidamente componentes pesados (como servicios de negocio, repositorios de datos o gestores de configuración) en cada solicitud o inyección genera un alto costo en consumo de memoria, sobrecarga en el recolector de basura (*Garbage Collector*) e inconsistencias en la gestión del estado compartido. 
 
-### Evidencia de código
-A continuación se muestra un extracto de la clase `DefaultSingletonBeanRegistry` que implementa el registro de instancias singleton:
+Spring resuelve esta problemática mediante el alcance *singleton* por defecto en su contenedor IoC. La clase `DefaultSingletonBeanRegistry` actúa como un registro centralizado que almacena y gestiona el ciclo de vida de todas las instancias únicas de beans definidas en el contexto. Cuando un componente requiere una dependencia, el contenedor consulta este registro para reutilizar la instancia existente en lugar de instanciar un objeto nuevo.
+
+### Extracto de Código Fuente
 
 ```java
-// org.springframework.beans.factory.support.DefaultSingletonBeanRegistry
-private final Map<String, Object> singletonObjects = new ConcurrentHashMap<>(256);
+package org.springframework.beans.factory.support;
 
-@Override
-public Object getSingleton(String beanName) {
-    return getSingleton(beanName, true);
-}
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.lang.Nullable;
 
-protected Object getSingleton(String beanName, boolean allowEarlyReference) {
-    Object singletonObject = this.singletonObjects.get(beanName);
-    if (singletonObject == null) {
-        // ... lógica de creación sincronizada
+public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements SingletonBeanRegistry {
+
+    /** Caché de objetos singleton: nombre del bean -> instancia del bean */
+    private final Map<String, Object> singletonObjects = new ConcurrentHashMap<>(256);
+
+    @Override
+    @Nullable
+    public Object getSingleton(String beanName) {
+        return getSingleton(beanName, true);
     }
-    return singletonObject;
+
+    @Nullable
+    protected Object getSingleton(String beanName, boolean allowEarlyReference) {
+        // Intenta obtener la instancia existente desde la caché concurrente
+        Object singletonObject = this.singletonObjects.get(beanName);
+        if (singletonObject == null && isSingletonCurrentlyInCreation(beanName)) {
+            synchronized (this.singletonObjects) {
+                singletonObject = this.singletonObjects.get(beanName);
+                if (singletonObject == null) {
+                    // Lógica para manejar referencias tempranas y resolución de dependencias circulares
+                }
+            }
+        }
+        return singletonObject;
+    }
 }
 ```
 
-El mapa `singletonObjects` actúa como el caché de instancias únicas, y el método `getSingleton` devuelve la instancia existente o la crea si no está presente.
+*Explicación técnica:* El atributo `singletonObjects` implementa una estructura de datos concurrente (`ConcurrentHashMap`) que almacena las referencias únicas asociadas a su identificador (`beanName`). El método `getSingleton` intercepta las solicitudes de resolución de beans para garantizar que solo se cree una instancia por cada bean registrado.
 
-### Principio SOLID asociado
-Este patrón refuerza el **Principio de Responsabilidad Única (SRP)**, ya que la responsabilidad de gestionar la unicidad y el ciclo de vida de los beans recae exclusivamente en el contenedor (la clase `DefaultSingletonBeanRegistry`), y no en las propias clases de negocio. Además, apoya el **Principio de Inversión de Dependencias (DIP)**, porque permite que las clases dependan de abstracciones (interfaces) y el contenedor inyecte la instancia única sin que las clases conozcan los detalles de su creación.
+### Principios SOLID Asociados
+1. **Principio de Responsabilidad Única (SRP - *Single Responsibility Principle*):** La responsabilidad de garantizar la unicidad de las instancias no recae sobre las clases de negocio escritas por el desarrollador, sino de manera exclusiva sobre la infraestructura del contenedor IoC mediante `DefaultSingletonBeanRegistry`.
+2. **Principio de Inversión de Dependencias (DIP - *Dependency Inversion Principle*):** Las clases de la aplicación dependen de abstracciones (interfaces de servicios) y no necesitan conocer el mecanismo de instanciación ni la gestión de unicidad del bean, recibiendo la referencia inyectada por el contenedor.
 
 ---
 
 ## 3. Análisis de Patrón 2: Proxy (Estructural)
 
-### Nombre y categoría
-* **Patrón:** Proxy  
-* **Categoría:** Estructural  
-* **Propósito:** Proporcionar un sustituto o intermediario para controlar el acceso a un objeto, añadiendo funcionalidades como logging, seguridad o lazy loading.
+### Nombre y Categoría
+* **Nombre del Patrón:** Proxy
+* **Categoría:** Estructural
+* **Propósito:** Proporcionar un sustituto o intermediario (*surrogate/placeholder*) para controlar el acceso a un objeto destino, permitiendo ejecutar lógica adicional antes o después de la llamada al objeto real.
 
-### Ubicación en Spring
-* **Clase:** `org.springframework.aop.framework.JdkDynamicAopProxy`  
-* **Módulo:** `spring-aop`
+### Clase / Componente en Spring
+* **Clase Concreta:** `org.springframework.aop.framework.JdkDynamicAopProxy`
+* **Módulo de Spring:** `spring-aop`
+* **Componente Asociado:** Programación Orientada a Aspectos (Spring AOP, `@Transactional`, `@Observed`, `@PreAuthorize`)
 
-### Problema que resuelve
-Spring AOP (*Aspect-Oriented Programming*) permite aplicar aspectos transversales (como logging, transacciones, seguridad) a métodos de beans sin modificar el código fuente de estos. Para ello, Spring crea un proxy que envuelve al objeto original e intercepta las llamadas a métodos, aplicando los *advices* (consejos) correspondientes. Sin el patrón Proxy, sería necesario modificar cada clase para añadir estas funcionalidades, violando el principio de separación de preocupaciones. El proxy actúa como un intermediario que delega la ejecución al objeto real después de aplicar los aspectos.
+### Problema que Resuelve
+En la arquitectura de software empresarial existen funcionalidades transversales o de corte vertical (*cross-cutting concerns*) como el manejo de transacciones de base de datos, el registro de auditoría (*logging*), la gestión de seguridad y el cálculo de métricas. Insertar manualmente este código repetitivo dentro de las clases de servicio contamina la lógica de negocio y genera una alta duplicación de código.
 
-### Evidencia de código
-Extracto de `JdkDynamicAopProxy` que muestra la invocación del método interceptado:
+Spring AOP resuelve esta problemática empleando el patrón Proxy. En lugar de inyectar directamente la clase de servicio real, Spring genera de forma dinámica un objeto Proxy (`JdkDynamicAopProxy` o un proxy CGLIB) que envuelve a la instancia real. Cuando se invoca un método annotated (por ejemplo con `@Transactional`), el Proxy intercepta la llamada, inicia la transacción, delega la ejecución al objeto objetivo y finalmente confirma o revierte la transacción según el resultado.
 
-```java
-// org.springframework.aop.framework.JdkDynamicAopProxy
-public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-    MethodInvocation invocation;
-    Object target = this.advised.getTargetSource().getTarget();
-    // ... se configura la invocación con los interceptores
-    invocation = new ReflectiveMethodInvocation(proxy, target, method, args, ...);
-    // Ejecuta la cadena de interceptores (advice)
-    return invocation.proceed();
-}
-```
-
-El método `invoke` captura la llamada al método, obtiene el objeto objetivo y ejecuta la cadena de interceptores (que incluyen los *advices* de AOP) antes de invocar finalmente el método real.
-
-### Principio SOLID asociado
-El patrón Proxy en Spring AOP implementa el **Principio de Abierto/Cerrado (OCP)**, ya que permite extender el comportamiento de los beans (añadir aspectos) sin modificar el código de las clases existentes. También respalda el **Principio de Responsabilidad Única (SRP)** al separar las preocupaciones transversales de la lógica de negocio.
-
----
-
-## 4. Análisis de Patrón 3: Observer (Comportamiento)
-
-### Nombre y categoría
-* **Patrón:** Observer (también conocido como *Event Listener*)  
-* **Categoría:** Comportamiento  
-* **Propósito:** Definir una dependencia uno-a-muchos entre objetos, de modo que cuando un objeto cambie de estado, todos sus dependientes sean notificados automáticamente.
-
-### Ubicación en Spring
-* **Clase:** `org.springframework.context.event.SimpleApplicationEventMulticaster` (publicador de eventos)  
-* **Interfaz:** `org.springframework.context.ApplicationListener` (receptor)  
-* **Módulo:** `spring-context`
-
-### Problema que resuelve
-Spring proporciona un mecanismo de eventos para comunicar componentes de forma desacoplada. Un componente puede publicar un evento (por ejemplo, `ApplicationEvent`) y otros componentes que implementen `ApplicationListener` pueden reaccionar a él. Esto permite una comunicación asíncrona y desacoplada, evitando que el publicador conozca a los receptores. Sin el patrón Observer, se necesitaría una dependencia directa entre componentes, lo que aumentaría el acoplamiento y dificultaría la extensibilidad.
-
-### Evidencia de código
-Extracto de `SimpleApplicationEventMulticaster` que muestra la notificación a los listeners:
+### Extracto de Código Fuente
 
 ```java
-// org.springframework.context.event.SimpleApplicationEventMulticaster
-public void multicastEvent(final ApplicationEvent event, @Nullable ResolvableType eventType) {
-    ResolvableType type = (eventType != null ? eventType : resolveDefaultEventType(event));
-    // Obtiene los listeners que escuchan este tipo de evento
-    for (final ApplicationListener<?> listener : getApplicationListeners(event, type)) {
-        Executor executor = getTaskExecutor();
-        if (executor != null) {
-            executor.execute(() -> invokeListener(listener, event));
+package org.springframework.aop.framework;
+
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.util.List;
+import org.aopalliance.intercept.MethodInvocation;
+
+final class JdkDynamicAopProxy implements AopProxy, InvocationHandler {
+
+    private final AdvisedSupport advised;
+
+    @Override
+    @Nullable
+    public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+        Object target = this.advised.getTargetSource().getTarget();
+        Class<?> targetClass = (target != null ? target.getClass() : null);
+
+        // Obtiene la cadena de interceptores (advices) aplicables al método invocado
+        List<Object> chain = this.advised.getInterceptorsAndDynamicInterceptionAdvice(method, targetClass);
+
+        if (chain.isEmpty()) {
+            // Si no hay aspectos aplicables, se invoca directamente el método sobre el objeto real
+            return AopUtils.invokeJoinpointUsingReflection(target, method, args);
         } else {
-            invokeListener(listener, event);
+            // Se crea la invocación reflexiva para ejecutar la cadena de interceptores
+            MethodInvocation invocation = new ReflectiveMethodInvocation(
+                proxy, target, method, args, targetClass, chain
+            );
+            // Procede a ejecutar los interceptores (advices) y finalmente el método objetivo
+            return invocation.proceed();
         }
     }
 }
 ```
 
-El multicaster obtiene todos los listeners registrados para el tipo de evento y los notifica, ejecutando la invocación de forma sincrónica o asincrónica según la configuración.
+*Explicación técnica:* La clase implementa `InvocationHandler` de Java Reflection. El método `invoke` intercepta todas las llamadas dirigidas al bean, obtiene los consejos (*advices*) mediante la cadena de interceptores y coordina la ejecución antes, durante y después de invocar el método del objeto `target`.
 
-### Principio SOLID asociado
-Este patrón aplica el **Principio de Inversión de Dependencias (DIP)**, ya que el publicador depende de la abstracción `ApplicationEvent` y los listeners dependen de la abstracción `ApplicationListener`, sin conocer las implementaciones concretas. También favorece el **Principio de Abierto/Cerrado (OCP)**, porque se pueden agregar nuevos listeners sin modificar el publicador.
+### Principios SOLID Asociados
+1. **Principio de Abierto/Cerrado (OCP - *Open/Closed Principle*):** Permite extender el comportamiento de las clases de negocio (añadiendo capacidades transaccionales, de seguridad o auditoría) sin necesidad de modificar el código fuente existente de dichas clases.
+2. **Principio de Responsabilidad Única (SRP - *Single Responsibility Principle*):** Separa limpiamente las preocupaciones transversales (gestión de infraestructura) de la lógica del dominio de negocio principal.
+
+---
+
+## 4. Análisis de Patrón 3: Observer (Comportamiento)
+
+### Nombre y Categoría
+* **Nombre del Patrón:** Observer (también denominado *Publisher-Subscriber* / *Event Listener*)
+* **Categoría:** Comportamiento
+* **Propósito:** Definir una dependencia de tipo uno-a-muchos entre objetos, de manera que cuando un objeto (sujeto/publicador) cambia su estado o emite una señal, todos sus dependientes (observadores/escuchadores) son notificados automáticamente.
+
+### Clase / Componente en Spring
+* **Clase Concreta / Publicador:** `org.springframework.context.event.SimpleApplicationEventMulticaster`
+* **Interfaz Receptor / Observador:** `org.springframework.context.ApplicationListener`
+* **Clase de Evento:** `org.springframework.context.ApplicationEvent`
+* **Módulo de Spring:** `spring-context`
+
+### Problema que Resuelve
+Cuando un módulo de la aplicación necesita reaccionar ante eventos ocurridos en otro módulo (por ejemplo, enviar un correo electrónico de bienvenida tras el registro exitoso de un usuario), invocar directamente el servicio de correo dentro del servicio de usuarios crea un acoplamiento rígido entre ambos componentes. Esto dificulta la reutilización, complica la realización de pruebas unitarias aisladas y viola la modularidad.
+
+El sistema de eventos de Spring, basado en el patrón Observer, resuelve este problema desacoplando al emisor del evento de sus receptores. El servicio de usuario únicamente publica un evento (`UserRegisteredEvent`) a través del multicaster (`SimpleApplicationEventMulticaster`). Cero o múltiples componentes registrados como `ApplicationListener` pueden escuchar y procesar dicho evento de manera sincrónica o asincrónica sin que el emisor conozca la existencia de los receptores.
+
+### Extracto de Código Fuente
+
+```java
+package org.springframework.context.event;
+
+import org.springframework.context.ApplicationEvent;
+import org.springframework.context.ApplicationListener;
+import org.springframework.core.ResolvableType;
+import org.springframework.lang.Nullable;
+import java.util.concurrent.Executor;
+
+public class SimpleApplicationEventMulticaster extends AbstractApplicationEventMulticaster {
+
+    @Override
+    public void multicastEvent(final ApplicationEvent event, @Nullable ResolvableType eventType) {
+        ResolvableType type = (eventType != null ? eventType : resolveDefaultEventType(event));
+        Executor executor = getTaskExecutor();
+
+        // Itera sobre todos los ApplicationListeners registrados para la tipología del evento
+        for (ApplicationListener<?> listener : getApplicationListeners(event, type)) {
+            if (executor != null) {
+                // Ejecución asincrónica si se ha configurado un Executor
+                executor.execute(() -> invokeListener(listener, event));
+            } else {
+                // Ejecución sincrónica por defecto
+                invokeListener(listener, event);
+            }
+        }
+    }
+
+    private void invokeListener(ApplicationListener listener, ApplicationEvent event) {
+        try {
+            listener.onApplicationEvent(event);
+        } catch (Throwable err) {
+            // Manejo estandarizado de excepciones durante la notificación
+        }
+    }
+}
+```
+
+*Explicación técnica:* El método `multicastEvent` consulta el registro interno de receptores (`getApplicationListeners`), filtra únicamente aquellos interesados en el tipo de evento actual y desencadena la llamada al método `onApplicationEvent` de cada suscriptor.
+
+### Principios SOLID Asociados
+1. **Principio de Inversión de Dependencias (DIP - *Dependency Inversion Principle*):** Tanto el publicador como los receptores dependen de abstracciones generales del marco de trabajo (`ApplicationEvent` y `ApplicationListener`) en lugar de depender de clases concretas entre sí.
+2. **Principio de Abierto/Cerrado (OCP - *Open/Closed Principle*):** Es posible agregar nuevos componentes escuchadores para reaccionar a un evento existente sin modificar una sola línea de código en el componente publicador ni en los demás escuchadores.
 
 ---
 
 ## 5. Conclusiones
 
-El análisis realizado evidencia que Spring Framework aplica de manera sistemática y coherente los patrones de diseño GoF para resolver problemas recurrentes en el desarrollo de aplicaciones empresariales. La adopción de patrones como Singleton, Proxy y Observer no solo mejora la calidad del framework (mantenibilidad, extensibilidad y desacoplamiento), sino que también educa a los desarrolladores sobre buenas prácticas arquitectónicas. La conexión de cada patrón con los principios SOLID demuestra que el diseño de Spring está alineado con los fundamentos de la ingeniería de software moderna. Como lección personal, este análisis refuerza la importancia de aplicar patrones de diseño y principios SOLID en el desarrollo propio, ya que permiten construir sistemas más flexibles, robustos y fáciles de mantener.
+El análisis arquitectónico realizado sobre Spring Framework evidencia de forma contundente cómo la integración estratégica de los patrones de diseño GoF —como Singleton en el contenedor IoC, Proxy en la capa de AOP y Observer en el subsistema de eventos— resulta determinante para garantizar el desacoplamiento, la extensibilidad y la rigurosidad técnica de los sistemas distribuidos orientados a objetos. Esta comprensión profunda del funcionamiento interno del framework nos enseña que los patrones no son simples recetas teóricas de código, sino pilares estructurales que articulan los principios SOLID, demostrándonos que la clave para diseñar aplicaciones robustas y sostenibles en nuestro propio desarrollo radica en aislar responsabilidades, programar hacia abstracciones y favorecer esquemas extensibles por encima del acoplamiento rígido.
 
 ---
 
 ## 6. Referencias
 
-1. Gamma, E., Helm, R., Johnson, R., & Vlissides, J. (1994). *Design Patterns: Elements of Reusable Object-Oriented Software*. Addison-Wesley.
-2. Spring Framework Documentation. (2026). *Core Technologies – The IoC Container*. Recuperado de https://docs.spring.io/spring-framework/reference/core/beans.html
-3. Spring Framework Documentation. (2026). *AOP – Proxying Mechanisms*. Recuperado de https://docs.spring.io/spring-framework/reference/core/aop/proxying.html
-4. Spring Framework Documentation. (2026). *Events and Listeners*. Recuperado de https://docs.spring.io/spring-framework/reference/core/beans/events.html
-5. Refactoring Guru. (s.f.). *Design Patterns*. Recuperado de https://refactoring.guru/design-patterns
+* Gamma, E., Helm, R., Johnson, R., & Vlissides, J. (1994). *Design Patterns: Elements of Reusable Object-Oriented Software*. Addison-Wesley.
+* Refactoring Guru. (s.f.). *Design Patterns in Java*. Recuperado de https://refactoring.guru/design-patterns/java
+* Spring Framework Documentation. (2026a). *Core Technologies: The IoC Container*. Spring Docs. Recuperado de https://docs.spring.io/spring-framework/reference/core/beans.html
+* Spring Framework Documentation. (2026b). *Aspect Oriented Programming with Spring*. Spring Docs. Recuperado de https://docs.spring.io/spring-framework/reference/core/aop.html
+* Spring Framework Documentation. (2026c). *Standard and Custom Events*. Spring Docs. Recuperado de https://docs.spring.io/spring-framework/reference/core/beans/context-introduction.html#context-functionality-events
