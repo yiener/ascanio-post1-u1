@@ -41,8 +41,11 @@ Ver análisis detallado en: [parte-2-analisis-gof-spring/documento-analisis.md](
 - Documentación oficial de Spring Boot y Refactoring Guru
 
 ---
+
+
 ## Estructura del repositorio
 
+```text
 ascanio-post1-u1/
 ├── parte-1-refactorizacion-solid/
 │   ├── pom.xml
@@ -68,16 +71,31 @@ ascanio-post1-u1/
 │   └── evidencia/
 │       └── (fragmentos de código de Spring)
 └── README.md
+```
 
-## Ejecucion
-# Moverse a la carpeta del proyecto Maven
+## Ejecución
+
+### Moverse a la carpeta del proyecto Maven
+
+```bash
 cd parte-1-refactorizacion-solid
+```
 
-# Compilar el proyecto
+### Compilar el proyecto
+
+```bash
 mvn clean compile
+```
 
-## salida 
+### Ejecutar la clase principal para ver la demostración
 
+```bash
+mvn exec:java -Dexec.mainClass="com.patrones.u1.Main"
+```
+
+## Salida
+
+```text
 [DB] Orden guardada: ORD-001
 [EMAIL] Enviando a vip@mail.com confirmación de orden ORD-001
 [DB] Orden guardada: ORD-002
@@ -85,7 +103,7 @@ mvn clean compile
 === Reporte de Órdenes ===
   ORD-001:297.5
   ORD-002:190.0
-# Ejecutar la clase principal para ver la demostración
-mvn exec:java -Dexec.mainClass="com.patrones.u1.Main"
+```
+
 ## Conclusiones
 La refactorización del God Object permitió evidenciar cómo los principios SOLID mejoran la mantenibilidad y extensibilidad del código, separando responsabilidades y favoreciendo la inyección de dependencias. Por otro lado, el análisis de Spring Framework demostró que los patrones GoF son fundamentales en frameworks maduros, proporcionando soluciones probadas para problemas recurrentes como la gestión de objetos, la separación de preocupaciones y la comunicación desacoplada. Estas experiencias refuerzan la importancia de diseñar con intención, aplicando patrones y principios de manera consciente para construir software robusto y adaptable, tal como se evidencia en el diseño de Spring.
